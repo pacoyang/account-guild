@@ -12,7 +12,8 @@ import {
   useSignMessage,
 } from 'wagmi'
 import { publicProvider } from 'wagmi/providers/public'
-import { InjectedConnector } from 'wagmi/connectors/injected'
+// import { InjectedConnector } from 'wagmi/connectors/injected'
+import { MetaMaskConnector } from 'wagmi/connectors/metaMask'
 
 const { chains, publicClient } = configureChains(
   [mainnet],
@@ -21,7 +22,10 @@ const { chains, publicClient } = configureChains(
 
 const config = createConfig({
   autoConnect: true,
-  connectors: [new InjectedConnector({ chains })],
+  connectors: [
+    // new InjectedConnector({ chains }),
+    new MetaMaskConnector({ chains })
+  ],
   publicClient,
 })
 
