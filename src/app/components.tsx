@@ -53,7 +53,7 @@ export const ConnectSection = () => {
 
   return isMounted ? (isConnected && connector) ? (
     <section className="flex flex-col gap-3">
-      <div>{address}</div>
+      <div className="break-all">{address}</div>
       <div>Connected to {connector.name}</div>
       <button
         className="rounded-md bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
@@ -107,6 +107,10 @@ export const DataSection = () => {
     event.preventDefault()
     const formData = new FormData(event.target)
     const message = formData.get('message') as string
+    if (!message) {
+      window.alert('Please enter urlnames')
+      return
+    }
     setLoading(true)
     const signature = await signMessageAsync({
       message,
