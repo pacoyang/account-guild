@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
+import { MetaMaskSDK } from '@metamask/sdk'
 import {
   WagmiConfig,
   createConfig,
@@ -13,7 +14,7 @@ import {
 } from 'wagmi'
 import { publicProvider } from 'wagmi/providers/public'
 import { InjectedConnector } from 'wagmi/connectors/injected'
-// import { MetaMaskConnector } from 'wagmi/connectors/metaMask'
+import { atom, useAtom, useAtomValue } from 'jotai'
 
 const { chains, publicClient } = configureChains(
   [mainnet],
@@ -24,10 +25,11 @@ const config = createConfig({
   autoConnect: true,
   connectors: [
     new InjectedConnector({ chains }),
-    // new MetaMaskConnector({ chains })
   ],
   publicClient,
 })
+
+const accountAtom = atom<string>('')
 
 export const Provider = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -50,6 +52,7 @@ export const ConnectSection = () => {
   const { address, connector, isConnected } = useAccount()
   const { connect, connectors, error: connectError, isLoading, pendingConnector } = useConnect()
   const { disconnect } = useDisconnect()
+  const [account, setAccount] = useAtom(accountAtom)
 
   function isMobile(): boolean {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -57,21 +60,28 @@ export const ConnectSection = () => {
     return mobileKeywords.some(keyword => userAgent.includes(keyword));
   }
 
-  const redictToMetaMask = () => {
+  const handleUnsupportMetaMaskConnect = async () => {
     if (isMobile()) {
-      window.location.href = window.location.href.replace(/(https?:\/\/)/g, 'dapp://')
-    } else {
-      window.open('https://metamask.io/')
+      const MMSDK = new MetaMaskSDK()
+      const provider = MMSDK.getProvider()
+      if (provider) {
+        const accounts = await provider.request({ method: 'eth_requestAccounts', params: [] })
+        if (accounts && (accounts as string[]).length > 0) {
+          setAccount((accounts as string[])[0])
+          return
+        }
+      }
     }
+    window.open('https://metamask.io/')
   }
 
-  return isMounted ? (isConnected && connector) ? (
+  return isMounted ? ((isConnected && connector) || account ) ? (
     <section className="flex flex-col gap-3">
-      <div className="break-all">{address}</div>
-      <div>Connected to {connector.name}</div>
+      <div className="break-all">{account || address}</div>
+      <div>Connected to {account ? 'MetaMask' : connector!.name}</div>
       <button
         className="rounded-md bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-        onClick={() => disconnect()}
+        onClick={() => account ? setAccount('') : disconnect()}
       >
         Disconnect
       </button>
@@ -94,7 +104,7 @@ export const ConnectSection = () => {
         <button
           key={connector.id}
           className="rounded-md bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-          onClick={redictToMetaMask}
+          onClick={handleUnsupportMetaMaskConnect}
         >
           MetaMask
         </button>
@@ -123,19 +133,37 @@ export const DataSection = () => {
   const { data, error, isLoading, signMessageAsync, variables } = useSignMessage()
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<UserGuild[]>([])
+  const account = useAtomValue(accountAtom)
 
   const handleSubmit = async (event: any) => {
     event.preventDefault()
     const formData = new FormData(event.target)
-    const message = formData.get('message') as string
+    let message = formData.get('message') as string
     if (!message) {
       window.alert('Please enter urlnames')
       return
     }
+    message = message.trim()
     setLoading(true)
-    const signature = await signMessageAsync({
-      message,
-    })
+    let signature
+    try {
+      if (account) {
+        const MMSDK = new MetaMaskSDK()
+        const provider = MMSDK.getProvider()
+        signature = await provider!.request({
+          method: 'personal_sign',
+          params: [message, account],
+        })
+      } else {
+        signature = await signMessageAsync({
+          message,
+        })
+      }
+    } catch {
+      window.alert('Fail to sign')
+      setLoading(false)
+      return
+    }
     const res = await fetch('/guild', {
       method: 'POST',
       headers: {
@@ -148,7 +176,7 @@ export const DataSection = () => {
     setItems(data.items)
   }
 
-  return isMounted && isConnected ? (
+  return isMounted && (isConnected || account) ? (
     <section>
       <form
         className="flex flex-col gap-3"
