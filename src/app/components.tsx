@@ -51,6 +51,20 @@ export const ConnectSection = () => {
   const { connect, connectors, error: connectError, isLoading, pendingConnector } = useConnect()
   const { disconnect } = useDisconnect()
 
+  function isMobile(): boolean {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const mobileKeywords = ['mobile', 'iphone', 'ipod', 'android', 'blackberry', 'windows phone'];
+    return mobileKeywords.some(keyword => userAgent.includes(keyword));
+  }
+
+  const redictToMetaMask = () => {
+    if (isMobile()) {
+      window.location.href = window.location.href.replace(/(https?:\/\/)/g, 'dapp://')
+    } else {
+      window.open('https://metamask.io/')
+    }
+  }
+
   return isMounted ? (isConnected && connector) ? (
     <section className="flex flex-col gap-3">
       <div className="break-all">{address}</div>
@@ -64,7 +78,7 @@ export const ConnectSection = () => {
     </section>
   ) : (
     <section className="flex flex-col gap-6">
-      {connectors.map((connector) => (
+      {connectors.map((connector) => connector.ready ? (
         <button
           className="rounded-md bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
           disabled={!connector.ready}
@@ -72,10 +86,17 @@ export const ConnectSection = () => {
           onClick={() => connect({ connector })}
         >
           {connector.name}
-          {!connector.ready && ' (unsupported)'}
           {isLoading &&
             connector.id === pendingConnector?.id &&
             ' (connecting)'}
+        </button>
+      ) : (
+        <button
+          key={connector.id}
+          className="rounded-md bg-white px-4 py-3 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          onClick={redictToMetaMask}
+        >
+          MetaMask
         </button>
       ))}
       {connectError && <div>{connectError.message}</div>}
